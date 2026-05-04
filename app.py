@@ -30,7 +30,21 @@ AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AZURE_STORAGE_CONTAINER         = os.getenv("AZURE_STORAGE_CONTAINER", "scan-images")
 
 # Blob service client
-blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+blob_service_client = None
+
+
+def get_blob_service():
+    global blob_service_client
+
+    conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+
+    if not conn_str:
+        raise RuntimeError("AZURE_STORAGE_CONNECTION_STRING is missing in Azure App Settings")
+
+    if blob_service_client is None:
+        blob_service_client = BlobServiceClient.from_connection_string(conn_str)
+
+    return blob_service_client
 
 # ─────────────────────────────────────────────
 # App & DB
@@ -174,7 +188,8 @@ async def upload_image_to_blob(image_bytes: bytes, original_filename: str) -> st
     ext       = original_filename.rsplit(".", 1)[-1] if "." in original_filename else "jpg"
     blob_name = f"{uuid.uuid4()}.{ext}"   # unique filename e.g. a1b2c3d4.jpg
 
-    container_client = blob_service_client.get_container_client(AZURE_STORAGE_CONTAINER)
+    service = get_blob_service()
+    container_client = service.get_container_client(AZURE_STORAGE_CONTAINER)
     container_client.upload_blob(name=blob_name, data=image_bytes, overwrite=True)
 
     # Build public URL
